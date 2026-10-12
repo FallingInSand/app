@@ -1961,6 +1961,7 @@ function applyEarned(total) {
     b.title = ok ? b.getAttribute('aria-label') : 'Unlocks at ' + b.dataset.need + ' days of peace';
   });
 }
+const REVIEW_AFTER = 3;   // days of peace before the one-time store rating prompt
 function completePeace() {
   const today = dayKey(new Date());
   daily.marked = false; daily.healing = false;
@@ -1992,6 +1993,12 @@ function completePeace() {
     // after the first peace, invite (once) a gentle reminder for tomorrow
     daily.state.remAsked = true; saveDaily();
     setTimeout(() => openReminder(true), 4800);
+  }
+  // Store apps: once, after the 3rd day of peace, let the store show its own rating prompt (the store decides
+  // whether it appears). Never a condition for anything, never on the web. After any milestone toast.
+  if (sum.total >= REVIEW_AFTER && !daily.state.reviewAsked && STORE && NATIVE && typeof NATIVE.requestReview === 'function' && !rec) {
+    daily.state.reviewAsked = true; saveDaily();
+    setTimeout(() => { try { NATIVE.requestReview(); } catch (e) {} }, 9000);
   }
 }
 function dailyTick(now) {
