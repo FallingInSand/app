@@ -1885,7 +1885,7 @@ const DAILY_HEAL_SPEED = 3;   // "Let it heal": the arm eases up to 3x so today'
 function loadDaily() { try { const v = JSON.parse(localStorage.getItem('sp_daily') || 'null'); if (v && Array.isArray(v.days)) daily.state = Object.assign(daily.state, v); } catch (e) {} }
 function saveDaily() { try { daily.state.days = daily.state.days.slice(-800); localStorage.setItem('sp_daily', JSON.stringify(daily.state)); } catch (e) {} }
 // stats-logic start (tests/stats.test.mjs)
-const TRACK_URL = 'https://sand-peace-events.qindongchen168.workers.dev/e';   // anonymous events endpoint (worker/). '' = nothing leaves the device
+const TRACK_URL = 'https://sand-peace-events.fallinginsand.workers.dev/e';   // anonymous events endpoint (worker/). '' = nothing leaves the device
 const APP_V = 'v29';    // keep in step with the "Sand Peace digital vNN" comment near the top
 // Anonymous statistics are on unless the person turns them off in Your peace. Off also forgets the random ID.
 function statsOn() { try { return localStorage.getItem('sp_stats') !== '0'; } catch (e) { return false; } }
