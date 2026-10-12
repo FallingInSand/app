@@ -123,6 +123,7 @@ button:focus-visible { outline: 2px solid var(--on); outline-offset: 2px; }
 .seg label.locked::after { content: " \1F512"; font-size: 0.8em; opacity: 0.75; }
 .sheet { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; padding: 20px; padding-top: calc(20px + env(safe-area-inset-top, 0px)); padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px)); background: rgba(10, 12, 15, 0.55); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
 .sheet[hidden] { display: none; }
+.sheet-card [hidden] { display: none !important; }
 .sheet-card { position: relative; width: min(100%, 380px); padding: 26px 22px 20px; border-radius: 20px; background: #1d2127; color: #eef1f4; text-align: center; box-shadow: 0 30px 60px -20px rgba(0,0,0,0.7); }
 .sheet-card h3 { font-family: "Instrument Serif", Georgia, serif; font-weight: 400; font-size: 1.9rem; line-height: 1.1; margin: 0 0 8px; }
 .sheet-card p { margin: 0 0 16px; color: #b9c2cc; font-size: 14px; }
@@ -918,7 +919,7 @@ function selectTool(v) {
   tool = v; document.getElementById('t-' + v).checked = true; swatches.hidden = v !== 'pour';
 }
 document.querySelectorAll('input[name="tool"]').forEach((el) => el.addEventListener('change', () => {
-  if ((el.value === 'scoop' || el.value === 'pour') && !isUnlocked()) { document.getElementById('t-' + tool).checked = true; openSheet(el.value); return; }
+  if ((el.value === 'scoop' || el.value === 'pour') && !toolOpen(el.value)) { document.getElementById('t-' + tool).checked = true; openSheet(el.value); return; }
   selectTool(el.value);
 }));
 swatches.querySelectorAll('.sw').forEach((b) => b.addEventListener('click', () => {
@@ -1647,28 +1648,38 @@ const sheetEl = document.getElementById('sheet'), toastEl = document.getElementB
 const shareNote = document.getElementById('shareNote'), sharedBtn = document.getElementById('sharedBtn'), codeNote = document.getElementById('codeNote');
 let pendingTool = null, cardFile = null;
 function isUnlocked() { try { return !!localStorage.getItem('sp_unlock'); } catch (e) { return false; } }
+// Scoop opens at 7 days of peace and Color sand at 30 (MILESTONES). On the web a shared Story or an owner code
+// opens both; 'streak' is the old 7-day unlock that opened both, kept for people who earned it before the split.
+function toolOpen(v) {
+  if (isUnlocked()) return true;
+  const ms = MILESTONES.find((m) => m.id === v); if (!ms) return true;
+  let total = 0; try { total = summarize(daily.state.days, dayKey(new Date())).total; } catch (e) {}
+  return total >= ms.d;
+}
+function refreshTools() { ['scoop', 'pour'].forEach((v) => { const l = document.querySelector('label[for="t-' + v + '"]'); if (l) l.classList.toggle('locked', !toolOpen(v)); }); }
 function toast(msg) { toastEl.textContent = msg; toastEl.classList.add('show'); setTimeout(() => toastEl.classList.remove('show'), 2600); }
 function unlock(how) {
   if (STORE && (how === 'code' || how === 'share')) return;   // store rules: unlocks come from days of peace (later: store purchase)
   try { localStorage.setItem('sp_unlock', how); } catch (e) {}
-  document.querySelectorAll('.seg label.locked').forEach((l) => l.classList.remove('locked'));
+  refreshTools();
   closeSheet();
   if (pendingTool) selectTool(pendingTool);
   toast(how === 'code' ? 'Welcome, owner. Everything is unlocked.' : 'Unlocked. Thanks for sharing.');
 }
-function storeSheet() {
+function storeSheet(want) {
   if (!STORE) return;
   ['shareBtn', 'shareNote', 'sharedBtn', 'codeNote'].forEach((id) => { const el = document.getElementById(id); if (el) el.hidden = true; });
   sheetEl.querySelectorAll('.or, .codebox').forEach((el) => { el.hidden = true; el.style.display = 'none'; });
   let total = 0; try { total = summarize(daily.state.days, dayKey(new Date())).total; } catch (e) {}
-  const left = Math.max(0, 7 - total);
-  document.getElementById('sheetTitle').textContent = 'Scoop and Color sand open at 7 days of peace';
+  const ms = MILESTONES.find((m) => m.id === want) || MILESTONES.find((m) => m.kind === 'tool');
+  const left = Math.max(0, ms.d - total);
+  document.getElementById('sheetTitle').textContent = ms.name + ' opens at ' + ms.d + ' days of peace';
   document.getElementById('sheetTitle').nextElementSibling.textContent = left > 0
-    ? 'You have ' + total + (total === 1 ? ' day' : ' days') + ' of peace. ' + left + ' more and they unlock on their own.'
-    : 'They unlock with your next peace.';
+    ? 'You have ' + total + (total === 1 ? ' day' : ' days') + ' of peace. ' + left + ' more and it unlocks on its own.'
+    : 'It unlocks with your next peace.';
 }
 function openSheet(want) {
-  pendingTool = want; storeSheet();
+  pendingTool = want; storeSheet(want);
   if (STORE) { sheetEl.hidden = false; return; } shareNote.textContent = ''; codeNote.textContent = ''; sharedBtn.hidden = true;
   sheetEl.hidden = false;
   buildCard().then((f) => { cardFile = f; }).catch(() => { cardFile = null; });
@@ -1750,7 +1761,6 @@ async function checkCode() {
 }
 document.getElementById('codeBtn').addEventListener('click', checkCode);
 document.getElementById('codeIn').addEventListener('keydown', (e) => { if (e.key === 'Enter') checkCode(); });
-if (isUnlocked()) document.querySelectorAll('.seg label.locked').forEach((l) => l.classList.remove('locked'));
 
 // ---------- Background picker (remembered per visitor) ----------
 const BGS = ['stone', 'linen', 'walnut', 'sage', 'night', 'dawn', 'seaglass', 'gold'];
@@ -1851,7 +1861,8 @@ const PROMPTS = [
 ];
 const MILESTONES = [
   { d: 3, kind: 'bg', id: 'dawn', name: 'the Dawn background' },
-  { d: 7, kind: 'tools', id: 'tools', name: 'Scoop and Color sand' },
+  { d: 7, kind: 'tool', id: 'scoop', name: 'Scoop' },
+  { d: 30, kind: 'tool', id: 'pour', name: 'Color sand' },
   { d: 30, kind: 'bg', id: 'seaglass', name: 'the Sea glass background' },
   { d: 100, kind: 'bg', id: 'gold', name: 'the Gold background' }
 ];
@@ -1956,6 +1967,7 @@ function renderDaily() {
 }
 function earned(total, id) { const ms = MILESTONES.find((m) => m.id === id); return !ms || total >= ms.d; }
 function applyEarned(total) {
+  refreshTools();
   document.querySelectorAll('.bgsw[data-need]').forEach((b) => {
     const ok = total >= +b.dataset.need;
     b.classList.toggle('locked', !ok);
@@ -1981,15 +1993,17 @@ function completePeace() {
   if (NATIVE && NATIVE.vibrate) { try { NATIVE.vibrate(30); } catch (e) {} } else if (navigator.vibrate) { try { navigator.vibrate([18, 60, 18]); } catch (e) {} }
   renderDaily();
   // a milestone reached today
-  const ms = MILESTONES.find((m) => m.d > before && m.d <= sum.total && !daily.state.seen.includes(m.id));
-  if (ms) {
-    daily.state.seen.push(ms.id); saveDaily(); track('milestone', { days: ms.d });
-    setTimeout(() => {
-      if (ms.kind === 'tools') {
-        if (!isUnlocked()) { try { localStorage.setItem('sp_unlock', 'streak'); } catch (e) {} document.querySelectorAll('.seg label.locked').forEach((l) => l.classList.remove('locked')); }
-        toast('7 days of peace. Scoop and Color sand are yours.');
-      } else { setBg(ms.id); toast(ms.d + ' days of peace. ' + ms.name.charAt(0).toUpperCase() + ms.name.slice(1) + ' is yours.'); }
-    }, 4600);
+  const reached = MILESTONES.filter((m) => m.d > before && m.d <= sum.total && !daily.state.seen.includes(m.id));
+  if (reached.length) {
+    reached.forEach((ms, i) => {
+      daily.state.seen.push(ms.id);
+      if (i === 0 || reached[i - 1].d !== ms.d) track('milestone', { days: ms.d });
+      setTimeout(() => {
+        if (ms.kind === 'tool') refreshTools(); else setBg(ms.id);
+        toast(ms.d + ' days of peace. ' + ms.name.charAt(0).toUpperCase() + ms.name.slice(1) + ' is yours.');
+      }, 4600 + i * 3000);
+    });
+    saveDaily();
   } else if (!daily.state.reminder && !daily.state.remAsked && !rec) {
     // after the first peace, invite (once) a gentle reminder for tomorrow
     daily.state.remAsked = true; saveDaily();
