@@ -6,6 +6,7 @@
   sends new data (for example when TRACK_URL is switched on).
   No web fonts here on purpose, so this page itself makes no third-party requests.
   The app embeds its fonts too; if that ever changes, restore the Fonts item under "connects to the internet".
+  The Anonymous statistics section must match the payload in index.html (track) and the rules in worker/src/index.js.
 -->
 <html lang="en">
 <head>
@@ -63,6 +64,7 @@ footer { color: var(--muted); font-size: 0.9rem; margin-top: 3rem; }
   <li>Your days of peace and your settings are saved only on your device.</li>
   <li>We do not receive what you write in the sand.</li>
   <li>We do not sell your information or track you across other apps and websites.</li>
+  <li>Anonymous statistics help us improve the app. You can turn them off in Your peace.</li>
 </ul>
 </div>
 
@@ -70,7 +72,7 @@ footer { color: var(--muted); font-size: 0.9rem; margin-top: 3rem; }
 Sand Peace is made by FallingIn Media Corp. ("FallingInSand", "we").</p>
 
 <h2>What stays on your device</h2>
-<p>Sand Peace keeps a small amount of information in your device's local app storage so it can work. None of it is sent to us.</p>
+<p>Sand Peace keeps a small amount of information in your device's local app storage so it can work. Apart from the anonymous statistics described below, none of it is sent to us.</p>
 <div class="wrap">
 <table>
   <tr><th>What</th><th>Why</th></tr>
@@ -78,14 +80,15 @@ Sand Peace is made by FallingIn Media Corp. ("FallingInSand", "we").</p>
   <tr><td>Settings: music, sand sound, background</td><td>To remember your choices</td></tr>
   <tr><td>Which tools you have unlocked</td><td>To keep Scoop and Colour sand open for you</td></tr>
   <tr><td>The date you last opened the app</td><td>To show the right daily question</td></tr>
-  <tr><td>A random ID created by the app, and a daily count of actions in the app (for example "ritual completed")</td><td>Reserved for anonymous app statistics. It is not linked to your name, email or device identifiers. Today it never leaves your device.</td></tr>
+  <tr><td>A random ID created by the app, and a daily count of actions in the app (for example "ritual completed")</td><td>For anonymous statistics (below). The ID is not linked to your name, email or device identifiers, and it is deleted when you turn statistics off.</td></tr>
+  <tr><td>Whether anonymous statistics are on</td><td>To respect your choice</td></tr>
   <tr><td>Which of two headline versions you see on the web</td><td>To compare two wordings of a message</td></tr>
 </table>
 </div>
 <p>The words you write are drawn into the sand on your screen. They are not saved to a server and we never see them.</p>
 
 <h2>When the app connects to the internet</h2>
-<p>The Sand Peace app works fully offline. Its fonts and artwork are built in, so once it is open it does not contact us or anyone else on its own. It only goes online when you tap one of these:</p>
+<p>The Sand Peace app works fully offline. Its fonts and artwork are built in. Once it is open, the only thing it sends on its own is anonymous statistics (below), which you can turn off. Otherwise it only goes online when you tap one of these:</p>
 <ul>
   <li><strong>Links to our shop.</strong> Some buttons open fallinginsand.com, where we sell the physical Sand Peace tray. These links include a tag showing which button you tapped (for example "footer"), so we can see which ones are useful. Our shop runs on Shopify and has its own privacy policy, shown on fallinginsand.com.</li>
   <li><strong>Calendar reminder (web only).</strong> If you add the daily reminder on the web, it opens Google Calendar with the event filled in. What happens next is between you and Google.</li>
@@ -102,8 +105,17 @@ Sand Peace is made by FallingIn Media Corp. ("FallingInSand", "we").</p>
   <li><strong>Vibration</strong> (Android) and haptics (iOS), for a gentle tap when you finish a ritual.</li>
 </ul>
 
-<h2>Statistics</h2>
-<p>This version of Sand Peace sends no statistics. If we start collecting anonymous usage statistics, such as how many people complete a ritual each day, we will update this page and the store privacy details first. Those statistics will not include your name, email, contacts, location or what you write, and they will not be used for advertising.</p>
+<h2>Anonymous statistics</h2>
+<p>To learn whether Sand Peace helps people come back to their daily minute, the app sends a short note when something happens in it, such as "app opened", "ritual done" or "reminder set". Each note contains:</p>
+<ul>
+  <li>what happened, and a few plain details about it (for example your total days of peace, the hour you chose for a reminder, or how many minutes a focus session lasted)</li>
+  <li>the date on your device (the day only, not the time)</li>
+  <li>the random ID the app created, so we can count returning visits without knowing who you are</li>
+  <li>whether you use the web, Android or iOS version, the app version, which of two headline wordings you saw, and which link brought you (for example "reminder")</li>
+</ul>
+<p>Notes never include your name, email, contacts, location, photos or what you write in the sand, and we do not store your IP address. We use them only to understand and improve Sand Peace: never for advertising, never to track you across other apps or websites, and we do not sell or share them.</p>
+<p>The notes are received by a small service we run on Cloudflare. Cloudflare handles the connection, which includes your IP address, to deliver it to us, and is bound by its own privacy policy (cloudflare.com/privacypolicy). We keep notes for up to 13 months, then delete them.</p>
+<p><strong>Turning it off:</strong> open Your peace (the settings button) and set Anonymous statistics to Off. The app stops sending notes straight away and deletes its random ID. If you turn it back on later, it starts with a new ID. Because notes are anonymous, we cannot find or delete the ones already sent from a particular device.</p>
 
 <h2>Children</h2>
 <p>Sand Peace is suitable for all ages but is not directed at children under 13. We do not knowingly collect personal information from anyone, including children.</p>
@@ -111,8 +123,9 @@ Sand Peace is made by FallingIn Media Corp. ("FallingInSand", "we").</p>
 <h2>Your choices</h2>
 <ul>
   <li>Turn off reminders in the app, or in your device's notification settings.</li>
+  <li>Turn off anonymous statistics in Your peace.</li>
   <li>Delete everything Sand Peace has saved by uninstalling the app, or on the web by clearing site data for app.fallinginsand.com.</li>
-  <li>Because we do not hold your information on our servers, there is nothing for us to export or delete. If you have a question, contact us below.</li>
+  <li>The only information we hold is the anonymous statistics above, which we cannot link to you. If you have a question, contact us below.</li>
 </ul>
 
 <h2>Changes</h2>

@@ -287,6 +287,7 @@ body.focus .stage { min-height: 100vh; min-height: 100dvh; justify-content: cent
 .set-col { flex-direction: column; align-items: flex-start; gap: 10px; }
 .set-k { font-size: 13px; color: #ece6da; }
 .set-note { font-size: 12px; color: #a1998c; }
+.set-line { display: flex; align-items: center; justify-content: space-between; gap: 14px; width: 100%; }
 .set-card .textbtn { color: #ece6da; }
 .set-card input[type=range] { width: 52%; accent-color: #d8c49c; }
 .set-card .bgpick { display: flex; flex-wrap: wrap; gap: 10px; }
@@ -411,6 +412,8 @@ body.focus .stage { min-height: 100vh; min-height: 100dvh; justify-content: cent
         <button class="bgsw" data-bg="gold" data-need="100" aria-label="Gold" aria-pressed="false" style="background:linear-gradient(135deg,#d9b46a,#4a3518)"></button>
       </span><span class="set-note" id="dNext"></span></div>
     <div class="set-row"><span class="set-k">Arm speed</span><input type="range" id="speed" min="0" max="100" value="55" aria-label="Arm speed"></div>
+    <div class="set-row set-col"><span class="set-line"><span class="set-k">Anonymous statistics</span><button class="textbtn" id="dStats" aria-pressed="true">On</button></span>
+      <span class="set-note">Counts like &ldquo;ritual done&rdquo;, with a random ID that isn&rsquo;t linked to you. Never what you write. Details: app.fallinginsand.com/privacy.html</span></div>
   </div>
 </div>
 <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" hidden>
@@ -1877,11 +1880,18 @@ function summarize(days, todayKey) {
 }
 // daily-logic end
 
-const TRACK_URL = '';   // set to your analytics endpoint once hosted on your own domain (e.g. a Cloudflare Worker)
 const daily = { state: { days: [], first: null, reminder: null, seen: [] }, marked: false, markedAt: 0, frame: 0, hold: 0, healing: false, lastT: 0 };
 const DAILY_HEAL_SPEED = 3;   // "Let it heal": the arm eases up to 3x so today's peace takes about half a minute
 function loadDaily() { try { const v = JSON.parse(localStorage.getItem('sp_daily') || 'null'); if (v && Array.isArray(v.days)) daily.state = Object.assign(daily.state, v); } catch (e) {} }
 function saveDaily() { try { daily.state.days = daily.state.days.slice(-800); localStorage.setItem('sp_daily', JSON.stringify(daily.state)); } catch (e) {} }
+// stats-logic start (tests/stats.test.mjs)
+const TRACK_URL = 'https://sand-peace-events.qindongchen168.workers.dev/e';   // anonymous events endpoint (worker/). '' = nothing leaves the device
+const APP_V = 'v29';    // keep in step with the "Sand Peace digital vNN" comment near the top
+// Anonymous statistics are on unless the person turns them off in Your peace. Off also forgets the random ID.
+function statsOn() { try { return localStorage.getItem('sp_stats') !== '0'; } catch (e) { return false; } }
+function setStats(on) {
+  try { if (on) localStorage.removeItem('sp_stats'); else { localStorage.setItem('sp_stats', '0'); localStorage.removeItem('sp_anon'); } } catch (e) {}
+}
 function anonId() {
   try { let id = localStorage.getItem('sp_anon'); if (!id) { id = Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('sp_anon', id); } return id; } catch (e) { return 'na'; }
 }
@@ -1894,10 +1904,11 @@ function track(name, props) {
     const keys = Object.keys(log).sort(); while (keys.length > 60) delete log[keys.shift()];
     localStorage.setItem('sp_events', JSON.stringify(log));
   } catch (e) {}
-  if (TRACK_URL && navigator.sendBeacon) {
-    try { navigator.sendBeacon(TRACK_URL, JSON.stringify(Object.assign({ e: name, d: today, id: anonId(), v: 'v23', ab: typeof variant === 'string' ? variant : '', app: PLATFORM, store: STORE }, props || {}))); } catch (e) {}
+  if (TRACK_URL && statsOn() && navigator.sendBeacon) {
+    try { navigator.sendBeacon(TRACK_URL, JSON.stringify(Object.assign({}, props || {}, { e: name, d: today, id: anonId(), v: APP_V, ab: typeof variant === 'string' ? variant : '', app: PLATFORM, store: STORE }))); } catch (e) {}
   }
 }
+// stats-logic end
 
 const dNum = document.getElementById('dNum'), dUnit = document.getElementById('dUnit'), dPrompt = document.getElementById('dPrompt');
 const dHeal = document.getElementById('dHeal'), dDate = document.getElementById('dDate'), sStat = document.getElementById('sStat');
@@ -1970,7 +1981,7 @@ function completePeace() {
   // a milestone reached today
   const ms = MILESTONES.find((m) => m.d > before && m.d <= sum.total && !daily.state.seen.includes(m.id));
   if (ms) {
-    daily.state.seen.push(ms.id); saveDaily(); track('milestone', { d: ms.d });
+    daily.state.seen.push(ms.id); saveDaily(); track('milestone', { days: ms.d });
     setTimeout(() => {
       if (ms.kind === 'tools') {
         if (!isUnlocked()) { try { localStorage.setItem('sp_unlock', 'streak'); } catch (e) {} document.querySelectorAll('.seg label.locked').forEach((l) => l.classList.remove('locked')); }
@@ -2054,6 +2065,14 @@ document.getElementById('remClose').addEventListener('click', closeReminder);
 remSheet.addEventListener('click', (e) => { if (e.target === remSheet) closeReminder(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !remSheet.hidden) closeReminder(); });
 dRemind.addEventListener('click', () => { closeSet(); openReminder(false); });
+const dStats = document.getElementById('dStats');
+function renderStats() {
+  const on = statsOn();
+  dStats.textContent = on ? 'On' : 'Off'; dStats.setAttribute('aria-pressed', on ? 'true' : 'false');
+  dStats.setAttribute('aria-label', 'Anonymous statistics: ' + (on ? 'on' : 'off'));
+}
+dStats.addEventListener('click', () => { setStats(!statsOn()); renderStats(); });
+renderStats();
 const setSheet = document.getElementById('setSheet');
 function openSet() { renderDaily(); setSheet.hidden = false; track('settings_open'); setTimeout(() => document.getElementById('setClose').focus(), 50); }
 function closeSet() { setSheet.hidden = true; }
