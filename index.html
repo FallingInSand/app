@@ -1225,12 +1225,10 @@ async function nativeSend(blob, name, action, text) {
 }
 
 // ---------- Viral mechanics (always free): sand messages and recorded heals ----------
-// Where shared links should send people. Change this to your own short domain once hosted.
-// On our own domain, shared links point back to wherever this page is hosted; inside claude.ai or the
-// Android app (no real web address) they fall back to the public link.
-const PLAY_FALLBACK = 'https://claude.ai/artifact/8qHwjh4fnPBWnHmdnVgdfk';
-const PLAY_URL = (/^https?:$/.test(location.protocol) && !/(^|\.)claude\.(ai|site)$|claudeusercontent|^app\.fallinginsand\.com$/.test(location.hostname))
-  ? location.origin + location.pathname : PLAY_FALLBACK;
+// Where shared links and calendar reminders send people: the public web app (GitHub Pages, FallingInSand/app).
+// The same on the web, in the Android and iOS shells and in previews, so every link opens a page that works.
+// Links shared before 2026-10-12 point at the old claude.ai preview; keep that page up for them.
+const PLAY_URL = 'https://app.fallinginsand.com/';
 let speedBoost = 1;
 
 // --- Sand messages: the visitor's recent Draw strokes are packed into the link itself (no server).
