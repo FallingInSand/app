@@ -1333,13 +1333,13 @@ function replayTick() {
   if (list) setTimeout(() => startReplay(list), 900);
 })();
 
-// --- Record a heal: you write (or scoop) at your own pace while the arm waits, tap Done,
-// then a gentle time-lapse records until the sand is fully healed, then a short end card.
+// --- Record a heal: you write (or scoop) at your own pace, tap Done, then the arm heals the sand at its
+// normal speed (no time-lapse, so the clip needs no speeding up) until it is fully healed, then a short end card.
 let rec = null;
 const recBtn = document.getElementById('recBtn'), recLabel = document.getElementById('recLabel'), stopBtn = document.getElementById('stopBtn');
-const WRITE_MAX = 40, HEAL_MIN = 5, HEAL_MAX = 30, END_LEN = 3.5, HEAL_SPEED = 5;
-const WRITE_SPEED = 0.2;   // while you write: the arm keeps turning, very slowly
-const RAMP_TIME = 3.5;     // after "let it heal": seconds to ease up to full heal speed
+const WRITE_MAX = 40, HEAL_MIN = 5, END_LEN = 3.5;
+// The heal stops once the sand is healed, or after one full turn of the arm at the chosen arm speed.
+function healMax() { return Math.min(100, revSeconds() * 1.1 + 2); }
 // ---------- Clip encoding ----------
 // Instagram (and many players) cut live-recorded browser video to 1-2 s: MediaRecorder writes WebM with
 // no duration and fragmented MP4 without a sample index. So where the browser can encode H.264 (Android,
@@ -1524,7 +1524,7 @@ function startRecording() {
   rec = { sink, comp, cx: comp.getContext('2d'), phase: 'write', t0: now, phaseT: now, stopped: false, n: 0 };
   if (tool === 'pour') selectTool('draw');
   hint.classList.add('gone');
-  speedBoost = WRITE_SPEED;                        // the arm drifts very slowly while you write
+  speedBoost = 1;                                  // the arm keeps its normal speed for the whole clip
   recBtn.textContent = 'Done \u2014 let it heal';
   recLabel.hidden = false; stopBtn.hidden = false; stopBtn.disabled = false;
   if (sink.start) sink.start();
@@ -1532,7 +1532,7 @@ function startRecording() {
 function toHeal() {
   if (!rec || rec.phase !== 'write') return;
   rec.phase = 'heal'; rec.phaseT = performance.now();
-  recBtn.disabled = true; recBtn.textContent = 'Healing\u2026';   // speed eases up in recordFrame
+  recBtn.disabled = true; recBtn.textContent = 'Healing\u2026';
 }
 recBtn.addEventListener('click', () => { if (!rec) startRecording(); else toHeal(); });
 // Stop at any moment: skip straight to the end card and save the video.
@@ -1553,11 +1553,11 @@ function recordFrame(now) {
   if (rec.phase === 'write') {
     if (pt > WRITE_MAX) toHeal();
     recLabel.textContent = '\u25CF Recording \u2014 write or scoop, then tap Done';
-    speedBoost = WRITE_SPEED;
+    speedBoost = 1;
   } else if (rec.phase === 'heal') {
     recLabel.textContent = '\u25CF Time heals\u2026';
-    { const k = Math.min(1, pt / RAMP_TIME), e = k * k * (3 - 2 * k); speedBoost = WRITE_SPEED + (HEAL_SPEED - WRITE_SPEED) * e; }
-    if ((pt > HEAL_MIN && rec.n % 15 === 0 && healedNow()) || pt > HEAL_MAX) { rec.phase = 'end'; rec.phaseT = now; speedBoost = 1; }
+    speedBoost = 1;
+    if ((pt > HEAL_MIN && rec.n % 15 === 0 && healedNow()) || pt > healMax()) { rec.phase = 'end'; rec.phaseT = now; speedBoost = 1; }
   } else if (rec.phase === 'end' && pt > END_LEN) {
     if (!rec.stopped) { rec.stopped = true; recLabel.hidden = true; rec.sink.stop(); }
     return;
