@@ -461,6 +461,15 @@ body.focus .stage { min-height: 100vh; min-height: 100dvh; justify-content: cent
     </div>
   </div>
 </div>
+<div class="sheet" id="fDoneSheet" role="dialog" aria-modal="true" aria-labelledby="fDoneTitle" hidden>
+  <div class="sheet-card">
+    <button class="x" id="fDoneClose" aria-label="Close">&times;</button>
+    <h3 id="fDoneTitle">Focus done</h3>
+    <p id="fDoneText">The sand kept turning the whole time.</p>
+    <button class="buy" id="fShare">Share</button>
+    <button class="link" id="fDoneLater">Close</button>
+  </div>
+</div>
 <div class="sheet" id="remSheet" role="dialog" aria-modal="true" aria-labelledby="remTitle" hidden>
   <div class="sheet-card">
     <button class="x" id="remClose" aria-label="Close">&times;</button>
@@ -2195,13 +2204,41 @@ function stopFocus() {
   if (!focusState.prevMusic && musicOn) setMusicLive(false);
   keepAwake(false); resize();
   track('focus_end', { mins: used, planned: focusState.mins, completed: focusState.done ? 1 : 0 });
+  if (used >= 1) showFocusDone(used);
 }
+// After a session: how long it was, and an optional share. Sharing never unlocks anything.
+const fDoneSheet = document.getElementById('fDoneSheet');
+let focusDoneMins = 0;
+function focusLength(m) {
+  if (m < 60) return m + (m === 1 ? ' minute' : ' minutes');
+  const h = Math.floor(m / 60), r = m % 60;
+  return h + (h === 1 ? ' hour' : ' hours') + (r ? ' ' + r + ' min' : '');
+}
+function showFocusDone(mins) {
+  focusDoneMins = mins;
+  document.getElementById('fDoneTitle').textContent = focusLength(mins) + ' of focus';
+  fDoneSheet.hidden = false;
+}
+async function shareFocus() {
+  track('focus_share', { mins: focusDoneMins });
+  const url = PLAY_URL + '?utm_source=focus_share&utm_medium=share&utm_campaign=focus';
+  const text = 'I just focused for ' + focusLength(focusDoneMins) + ' with the sand turning. Sand Peace by ' + HANDLE_MAIN;
+  fDoneSheet.hidden = true;
+  if (NATIVE) { NATIVE.shareText(text + ' ' + url); return; }
+  try { if (navigator.share) { await navigator.share({ title: 'Focus with Sand Peace', text, url }); return; } }
+  catch (e) { if (e && e.name === 'AbortError') return; }
+  try { await navigator.clipboard.writeText(text + ' ' + url); toast('Copied. Paste it wherever you like.'); }
+  catch (e) { prompt('Copy this and share it:', text + ' ' + url); }
+}
+document.getElementById('fShare').addEventListener('click', shareFocus);
+['fDoneClose', 'fDoneLater'].forEach((id) => document.getElementById(id).addEventListener('click', () => { fDoneSheet.hidden = true; }));
+fDoneSheet.addEventListener('click', (e) => { if (e.target === fDoneSheet) fDoneSheet.hidden = true; });
 document.getElementById('focusBtn').addEventListener('click', () => { focusSheet.hidden = false; });
 document.getElementById('focusClose').addEventListener('click', () => { focusSheet.hidden = true; });
 focusSheet.addEventListener('click', (e) => { if (e.target === focusSheet) focusSheet.hidden = true; });
 focusSheet.querySelectorAll('[data-min]').forEach((b) => b.addEventListener('click', () => startFocus(+b.dataset.min)));
 document.getElementById('fDone').addEventListener('click', stopFocus);
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (!focusSheet.hidden) focusSheet.hidden = true; else if (focusState.on) stopFocus(); } });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (!fDoneSheet.hidden) fDoneSheet.hidden = true; else if (!focusSheet.hidden) focusSheet.hidden = true; else if (focusState.on) stopFocus(); } });
 document.addEventListener('visibilitychange', () => { if (!document.hidden && focusState.on) { keepAwake(true); focusTick(); } });
 
 // ---------- Loop ----------
