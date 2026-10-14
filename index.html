@@ -184,6 +184,8 @@ h1 .tm { font-family: "Instrument Sans", system-ui, sans-serif; font-size: 0.32e
 /* Focus board (web only) */
 .bin { display: block; width: 100%; margin: 0 0 10px; padding: 11px 14px; border-radius: 12px; border: 1px solid rgba(236,230,218,0.18); background: rgba(236,230,218,0.06); color: inherit; font: inherit; font-size: 15px; }
 .bin option { color: #1b1a17; }
+.hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+.sheet-card .small a { color: inherit; }
 .bjoin { margin-top: 4px; }
 .btabs { display: flex; gap: 6px; justify-content: center; margin: 0 0 12px; }
 .btabs button { padding: 6px 14px; font-size: 13px; background: transparent; box-shadow: inset 0 0 0 1px rgba(236,230,218,0.2); color: inherit; }
@@ -317,6 +319,7 @@ body.focus .stage { min-height: 100vh; min-height: 100dvh; justify-content: cent
 .set-card h3 { margin-bottom: 4px; }
 .set-stat { margin: 0 0 14px !important; font-size: 13px; }
 .set-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 0; border-top: 1px solid rgba(236,230,218,0.08); }
+.set-row[hidden] { display: none; }
 .set-col { flex-direction: column; align-items: flex-start; gap: 10px; }
 .set-k { font-size: 13px; color: #ece6da; }
 .set-note { font-size: 12px; color: #a1998c; }
@@ -433,6 +436,7 @@ body.focus .stage { min-height: 100vh; min-height: 100dvh; justify-content: cent
     <h3 id="setTitle">Your peace</h3>
     <p class="set-stat" id="sStat"></p>
     <div class="set-row"><span class="set-k">Reminder</span><button class="textbtn" id="dRemind">Remind me daily</button></div>
+    <div class="set-row"><span class="set-k">Email news</span><button class="textbtn" id="dMail">Sign up</button></div>
     <div class="set-row set-col"><span class="set-k">Background</span><span class="bgpick" role="group" aria-label="Background">
         <button class="bgsw" data-bg="stone" aria-label="Basalt" aria-pressed="true" style="background:radial-gradient(circle at 40% 35%,#3a3733,#121110)"></button>
         <button class="bgsw" data-bg="linen" aria-label="Linen" aria-pressed="false" style="background:#ece6db"></button>
@@ -509,6 +513,22 @@ body.focus .stage { min-height: 100vh; min-height: 100dvh; justify-content: cent
     <ol class="blist" id="boardList" aria-live="polite"></ol>
     <p class="small">Names are chosen by the people on the board. Report anything unkind.</p>
     <button class="textbtn" id="boardRemove" hidden>Remove my name</button>
+  </div>
+</div>
+<div class="sheet" id="mailSheet" role="dialog" aria-modal="true" aria-labelledby="mailTitle" hidden>
+  <div class="sheet-card">
+    <button class="x" id="mailClose" aria-label="Close">&times;</button>
+    <h3 id="mailTitle">Sand Peace news</h3>
+    <form id="mailForm">
+      <p>New sand, new patterns and the occasional note from the FallingInSand studio. About twice a month.</p>
+      <input class="bin" type="email" id="mailEmail" autocomplete="email" inputmode="email" placeholder="Your email" aria-label="Your email" required>
+      <input class="hp" type="text" id="mailHp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <button class="buy" id="mailGo" type="submit">Sign me up</button>
+      <p class="small" id="mailNote">Emails come from FallingIn Media Corp. (FallingInSand). Unsubscribe in any email.
+        <a href="https://app.fallinginsand.com/privacy.html" target="_blank" rel="noopener">Privacy</a></p>
+    </form>
+    <p id="mailThanks" hidden>You&rsquo;re on the list. Thank you.</p>
+    <button class="link" id="mailLater">Not now</button>
   </div>
 </div>
 <div class="sheet" id="remSheet" role="dialog" aria-modal="true" aria-labelledby="remTitle" hidden>
@@ -2074,6 +2094,10 @@ function completePeace() {
     // after the first peace, invite (once) a gentle reminder for tomorrow
     daily.state.remAsked = true; saveDaily();
     setTimeout(() => openReminder(true), 4800);
+  } else if (sum.total >= 2 && !daily.state.mailAsked && !mailSignedUp() && !rec) {
+    // from the second day of peace, invite (once) to the email news. Never a condition for anything.
+    daily.state.mailAsked = true; saveDaily();
+    setTimeout(() => openMail('after_peace'), 4800);
   }
   // Store apps: once, after the 3rd day of peace, let the store show its own rating prompt (the store decides
   // whether it appears). Never a condition for anything, never on the web. After any milestone toast.
@@ -2284,6 +2308,46 @@ focusSheet.querySelectorAll('[data-min]').forEach((b) => b.addEventListener('cli
 document.getElementById('fDone').addEventListener('click', stopFocus);
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (!fDoneSheet.hidden) fDoneSheet.hidden = true; else if (!focusSheet.hidden) focusSheet.hidden = true; else if (focusState.on) stopFocus(); } });
 document.addEventListener('visibilitychange', () => { if (!document.hidden && focusState.on) { keepAwake(true); focusTick(); } });
+
+// ---------- Email news (optional; worker/src/subscribe.js adds the address to the shop's Shopify list) ----------
+// Nothing unlocks with it. The address goes to our server only to be passed to Shopify; it isn't stored here.
+const SUB_URL = TRACK_URL ? TRACK_URL.replace(/\/e$/, '/subscribe') : '';
+const mailSheet = document.getElementById('mailSheet'), mailForm = document.getElementById('mailForm');
+const mailEmail = document.getElementById('mailEmail'), mailGo = document.getElementById('mailGo'), mailNote = document.getElementById('mailNote');
+const MAIL_NOTE = mailNote.innerHTML;
+let mailSrc = 'settings';
+function mailSignedUp() { try { return localStorage.getItem('sp_mail') === '1'; } catch (e) { return false; } }
+function syncMailRow() { const b = document.getElementById('dMail'); b.textContent = mailSignedUp() ? 'Signed up' : 'Sign up'; b.disabled = mailSignedUp(); }
+function openMail(src) {
+  if (!SUB_URL || mailSignedUp()) return;
+  mailSrc = src; mailForm.hidden = false; document.getElementById('mailThanks').hidden = true;
+  document.getElementById('mailLater').textContent = 'Not now';
+  mailGo.disabled = false; mailNote.innerHTML = MAIL_NOTE;
+  mailSheet.hidden = false;
+  track('mail_open', { src });
+}
+function closeMail() { mailSheet.hidden = true; }
+mailForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  mailGo.disabled = true; mailNote.textContent = 'Signing you up…';
+  try {
+    const r = await fetch(SUB_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: mailEmail.value, consent: true, src: mailSrc, website: document.getElementById('mailHp').value }) });
+    let d = {}; try { d = await r.json(); } catch (err) {}
+    if (!r.ok) throw new Error(d.error || 'Couldn’t sign you up just now. Please try again later.');
+    try { localStorage.setItem('sp_mail', '1'); } catch (err) {}
+    track('mail_signup', { src: mailSrc });
+    mailForm.hidden = true; document.getElementById('mailThanks').hidden = false;
+    document.getElementById('mailLater').textContent = 'Close';
+    mailEmail.value = ''; syncMailRow();
+  } catch (err) { mailNote.textContent = err.message; mailGo.disabled = false; }
+});
+document.getElementById('dMail').addEventListener('click', () => openMail('settings'));
+document.getElementById('dMail').closest('.set-row').hidden = !SUB_URL;
+['mailClose', 'mailLater'].forEach((id) => document.getElementById(id).addEventListener('click', closeMail));
+mailSheet.addEventListener('click', (e) => { if (e.target === mailSheet) closeMail(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !mailSheet.hidden) closeMail(); });
+syncMailRow();
 
 // ---------- Focus board (web only; docs/decisions/2026-10-14-focus-board-web-only.md) ----------
 // The server times each web focus session (start, stop) so the board can't be given made-up minutes. People who
