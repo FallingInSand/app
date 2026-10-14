@@ -181,6 +181,21 @@ h1 .tm { font-family: "Instrument Sans", system-ui, sans-serif; font-size: 0.32e
 .reclabel { position: absolute; left: 50%; top: 6%; transform: translateX(-50%); padding: 7px 14px; border-radius: 999px; background: rgba(170, 30, 40, 0.86); color: #fff; font-size: 13px; font-weight: 600; pointer-events: none; }
 #clipVideo { width: 100%; max-height: 46vh; border-radius: 12px; background: #000; margin: 4px 0 12px; }
 .sheet-card a.link { display: block; text-decoration: none; padding: 10px; border-radius: 999px; }
+/* Focus board (web only) */
+.bin { display: block; width: 100%; margin: 0 0 10px; padding: 11px 14px; border-radius: 12px; border: 1px solid rgba(236,230,218,0.18); background: rgba(236,230,218,0.06); color: inherit; font: inherit; font-size: 15px; }
+.bin option { color: #1b1a17; }
+.bjoin { margin-top: 4px; }
+.btabs { display: flex; gap: 6px; justify-content: center; margin: 0 0 12px; }
+.btabs button { padding: 6px 14px; font-size: 13px; background: transparent; box-shadow: inset 0 0 0 1px rgba(236,230,218,0.2); color: inherit; }
+.btabs button[aria-selected="true"] { background: #ece6da; color: #1b1a17; box-shadow: none; }
+.blist { list-style: none; margin: 0 0 6px; padding: 0; max-height: 46vh; overflow-y: auto; text-align: left; }
+.blist li { display: flex; align-items: center; gap: 10px; padding: 9px 6px; border-top: 1px solid rgba(236,230,218,0.08); font-size: 14px; }
+.blist li.me { background: rgba(236,230,218,0.08); border-radius: 8px; }
+.blist li.gap { justify-content: center; color: #a1998c; padding: 2px; border: 0; }
+.blist .br { min-width: 2.4em; color: #a1998c; font-variant-numeric: tabular-nums; }
+.blist .bn { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.blist .bm { color: #a1998c; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.blist .brep { padding: 2px 4px; font-size: 12px; background: none; box-shadow: none; color: #a1998c; text-decoration: underline; text-underline-offset: 2px; }
 .toast { position: fixed; left: 50%; top: calc(16px + env(safe-area-inset-top, 0px)); transform: translate(-50%, -20px); z-index: 30; padding: 10px 18px; border-radius: 999px; background: #1d2127; color: #eef1f4; font-size: 14px; opacity: 0; transition: opacity 0.4s ease, transform 0.4s ease; pointer-events: none; }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 .bgpick { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
@@ -459,6 +474,7 @@ body.focus .stage { min-height: 100vh; min-height: 100dvh; justify-content: cent
       <button class="vbtn" data-min="50">50 minutes</button>
       <button class="vbtn" data-min="0">Open-ended</button>
     </div>
+    <button class="link" id="focusBoard" hidden>See today's focus board</button>
   </div>
 </div>
 <div class="sheet" id="fDoneSheet" role="dialog" aria-modal="true" aria-labelledby="fDoneTitle" hidden>
@@ -467,7 +483,32 @@ body.focus .stage { min-height: 100vh; min-height: 100dvh; justify-content: cent
     <h3 id="fDoneTitle">Focus done</h3>
     <p id="fDoneText">The sand kept turning the whole time.</p>
     <button class="buy" id="fShare">Share</button>
+    <div class="bjoin" id="bJoin" hidden>
+      <button class="link" id="bJoinOpen">Add to today's focus board</button>
+      <form id="bForm" hidden>
+        <input class="bin" id="bName" maxlength="20" autocomplete="nickname" placeholder="Your name" aria-label="Name to show on the board">
+        <select class="bin" id="bCountry" aria-label="Country, optional"><option value="">Country (optional)</option></select>
+        <button class="buy" id="bAdd" type="submit">Add</button>
+        <p class="small" id="bMsg">Your name, country and minutes are public for 30 days.</p>
+      </form>
+      <p class="small" id="bDone" hidden></p>
+      <button class="link" id="bSee" hidden>See the board</button>
+    </div>
     <button class="link" id="fDoneLater">Close</button>
+  </div>
+</div>
+<div class="sheet" id="boardSheet" role="dialog" aria-modal="true" aria-labelledby="boardTitle" hidden>
+  <div class="sheet-card">
+    <button class="x" id="boardClose" aria-label="Close">&times;</button>
+    <h3 id="boardTitle">Today's focus</h3>
+    <p id="boardSub">The last 24 hours</p>
+    <div class="btabs" role="tablist">
+      <button role="tab" id="tabPeople" aria-selected="true">People</button>
+      <button role="tab" id="tabCountries" aria-selected="false">Countries</button>
+    </div>
+    <ol class="blist" id="boardList" aria-live="polite"></ol>
+    <p class="small">Names are chosen by the people on the board. Report anything unkind.</p>
+    <button class="textbtn" id="boardRemove" hidden>Remove my name</button>
   </div>
 </div>
 <div class="sheet" id="remSheet" role="dialog" aria-modal="true" aria-labelledby="remTitle" hidden>
@@ -2195,6 +2236,7 @@ function startFocus(mins) {
   keepAwake(true);
   focusTick(); focusState.timer = setInterval(focusTick, 1000);
   track('focus_start', { mins });
+  boardStart();
 }
 function stopFocus() {
   if (!focusState.on) return;
@@ -2204,6 +2246,7 @@ function stopFocus() {
   if (!focusState.prevMusic && musicOn) setMusicLive(false);
   keepAwake(false); resize();
   track('focus_end', { mins: used, planned: focusState.mins, completed: focusState.done ? 1 : 0 });
+  boardStop();
   if (used >= 1) showFocusDone(used);
 }
 // After a session: how long it was, and an optional share. Sharing never unlocks anything.
@@ -2217,6 +2260,7 @@ function focusLength(m) {
 function showFocusDone(mins) {
   focusDoneMins = mins;
   document.getElementById('fDoneTitle').textContent = focusLength(mins) + ' of focus';
+  boardOffer();
   fDoneSheet.hidden = false;
 }
 async function shareFocus() {
@@ -2240,6 +2284,135 @@ focusSheet.querySelectorAll('[data-min]').forEach((b) => b.addEventListener('cli
 document.getElementById('fDone').addEventListener('click', stopFocus);
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (!fDoneSheet.hidden) fDoneSheet.hidden = true; else if (!focusSheet.hidden) focusSheet.hidden = true; else if (focusState.on) stopFocus(); } });
 document.addEventListener('visibilitychange', () => { if (!document.hidden && focusState.on) { keepAwake(true); focusTick(); } });
+
+// ---------- Focus board (web only; docs/decisions/2026-10-14-focus-board-web-only.md) ----------
+// The server times each web focus session (start, stop) so the board can't be given made-up minutes. People who
+// want to appear add a name and an optional country after the session. Store builds never call it or show it.
+const BOARD_URL = (!NATIVE && TRACK_URL) ? TRACK_URL.replace(/\/e$/, '/board') : '';
+const COUNTRY_CODES = 'AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ DE DJ DK DM DO DZ EC EE EG EH ER ES ET FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY HK HM HN HR HT HU ID IE IL IM IN IO IQ IR IS IT JE JM JO JP KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG UM US UY UZ VA VC VE VG VI VN VU WF WS YE YT ZA ZM ZW'.split(' ');   // same list as worker/src/board.js (tests/board.test.mjs checks)
+const lsGet = (k) => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } };
+const lsSet = (k, v) => { try { if (v) localStorage.setItem(k, v); else localStorage.removeItem(k); } catch (e) {} };
+function boardKey() {   // random, made here, never shown; the board only ever shows a hash of it
+  let k = lsGet('sp_board_key');
+  if (!/^[a-z0-9]{16,40}$/.test(k)) { k = Array.from(crypto.getRandomValues(new Uint8Array(24)), (b) => (b % 36).toString(36)).join(''); lsSet('sp_board_key', k); }
+  return k;
+}
+async function boardCall(path, body) {
+  const init = body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true, body: JSON.stringify(Object.assign({ key: boardKey() }, body)) } : { cache: 'no-store' };
+  const r = await fetch(BOARD_URL + path, init);
+  let data = {}; try { data = await r.json(); } catch (e) {}
+  if (!r.ok) throw new Error(data.error || 'The board is not available right now.');
+  return data;
+}
+let boardStarting = null, boardStopped = null;
+function boardStart() {   // only with statistics on, or for someone already on the board
+  boardStarting = null; boardStopped = null;
+  if (!BOARD_URL || !(statsOn() || lsGet('sp_board_pid'))) return;
+  boardStarting = boardCall('/start', {}).then((d) => d.sid).catch(() => '');
+}
+function boardStop() {
+  if (!boardStarting) { boardStopped = null; return; }
+  boardStopped = boardStarting.then((sid) => sid ? boardCall('/stop', { sid }).then((d) => ({ sid, mins: d.mins })) : null).catch(() => null);
+  boardStarting = null;
+}
+const flag = (c) => c ? String.fromCodePoint(...[...c].map((ch) => 0x1F1E6 + ch.charCodeAt(0) - 65)) : '';
+const regionNames = (() => { try { return new Intl.DisplayNames([navigator.language || 'en'], { type: 'region' }); } catch (e) { return null; } })();
+const countryName = (c) => { try { return (regionNames && regionNames.of(c)) || c; } catch (e) { return c; } };
+const boardMins = (m) => m < 60 ? m + ' min' : Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + (m % 60) + ' min' : '');
+const bJoin = document.getElementById('bJoin'), bForm = document.getElementById('bForm'), bJoinOpen = document.getElementById('bJoinOpen');
+const bName = document.getElementById('bName'), bCountry = document.getElementById('bCountry'), bAdd = document.getElementById('bAdd');
+const bMsg = document.getElementById('bMsg'), bDone = document.getElementById('bDone'), bSee = document.getElementById('bSee');
+const boardSheet = document.getElementById('boardSheet'), boardList = document.getElementById('boardList'), boardSub = document.getElementById('boardSub');
+const boardRemove = document.getElementById('boardRemove');
+function boardOffer() {
+  bJoin.hidden = !boardStopped;
+  bForm.hidden = true; bJoinOpen.hidden = false; bDone.hidden = true; bSee.hidden = true;
+  bAdd.disabled = false; bMsg.textContent = 'Your name, country and minutes are public for 30 days.';
+}
+bJoinOpen.addEventListener('click', () => {
+  if (bCountry.options.length === 1) {
+    COUNTRY_CODES.map((c) => [c, countryName(c)]).sort((a, b) => a[1].localeCompare(b[1])).forEach(([c, n]) => bCountry.add(new Option(flag(c) + ' ' + n, c)));
+  }
+  let guess = lsGet('sp_board_country');
+  if (!guess) { try { guess = new Intl.Locale(navigator.language).region || ''; } catch (e) { guess = ''; } }
+  bName.value = lsGet('sp_board_name'); bCountry.value = COUNTRY_CODES.includes(guess) ? guess : '';
+  bJoinOpen.hidden = true; bForm.hidden = false; bName.focus();
+});
+bForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  bAdd.disabled = true; bMsg.textContent = 'Adding…';
+  try {
+    const st = await boardStopped;
+    if (!st) throw new Error('This session can no longer be added.');
+    const d = await boardCall('/join', { sid: st.sid, name: bName.value, country: bCountry.value });
+    lsSet('sp_board_name', bName.value.trim()); lsSet('sp_board_country', bCountry.value); lsSet('sp_board_pid', d.pid);
+    boardStopped = null;
+    track('board_join', { mins: d.mins });
+    bForm.hidden = true;
+    bDone.textContent = d.me ? 'You are #' + d.me.rank + ' of ' + d.people + ' in the last 24 hours.' : 'Added to the board.';
+    bDone.hidden = false; bSee.hidden = false;
+  } catch (err) { bMsg.textContent = err.message; bAdd.disabled = false; }
+});
+let boardData = null, boardTab = 'people';
+function boardRow(cells, cls) {
+  const li = document.createElement('li'); if (cls) li.className = cls;
+  for (const [k, text] of cells) { const sp = document.createElement('span'); sp.className = k; sp.textContent = text; li.appendChild(sp); }
+  return li;
+}
+function renderBoard() {
+  boardList.textContent = '';
+  document.getElementById('tabPeople').setAttribute('aria-selected', String(boardTab === 'people'));
+  document.getElementById('tabCountries').setAttribute('aria-selected', String(boardTab === 'countries'));
+  if (!boardData) return;
+  const mine = lsGet('sp_board_pid');
+  boardSub.textContent = 'The last 24 hours · ' + boardData.people + (boardData.people === 1 ? ' person' : ' people');
+  if (boardTab === 'countries') {
+    boardData.countries.forEach((c, i) => boardList.appendChild(boardRow([['br', '#' + (i + 1)], ['bn', flag(c.country) + ' ' + countryName(c.country)],
+      ['bm', boardMins(c.mins) + ' · ' + c.people + (c.people === 1 ? ' person' : ' people')]])));
+  } else {
+    for (const p of boardData.top) {
+      const li = boardRow([['br', '#' + p.rank], ['bn', (p.country ? flag(p.country) + ' ' : '') + p.name], ['bm', boardMins(p.mins)]], p.pid === mine ? 'me' : '');
+      if (p.pid !== mine) {
+        const rb = document.createElement('button'); rb.className = 'brep'; rb.textContent = 'Report'; rb.setAttribute('aria-label', 'Report ' + p.name);
+        rb.addEventListener('click', () => reportName(p, li)); li.appendChild(rb);
+      }
+      boardList.appendChild(li);
+    }
+    if (boardData.me && !boardData.top.some((p) => p.pid === mine)) {
+      boardList.appendChild(boardRow([['bn', '…']], 'gap'));
+      boardList.appendChild(boardRow([['br', '#' + boardData.me.rank], ['bn', 'You'], ['bm', boardMins(boardData.me.mins)]], 'me'));
+    }
+  }
+  if (!boardList.children.length) boardList.appendChild(boardRow([['bn', 'No one yet today. Focus for a minute and add your name.']]));
+}
+async function openBoard() {
+  boardSheet.hidden = false; boardData = null; renderBoard();
+  boardSub.textContent = 'Loading…';
+  boardRemove.hidden = !lsGet('sp_board_pid');
+  track('board_view');
+  try {
+    const pid = lsGet('sp_board_pid');
+    boardData = await boardCall(pid ? '?pid=' + encodeURIComponent(pid) : '');
+    renderBoard();
+  } catch (e) { boardSub.textContent = e.message; }
+}
+async function reportName(p, li) {
+  if (!confirm('Report "' + p.name + '" as unkind or not right for the board?')) return;
+  try { await boardCall('/report', { pid: p.pid }); li.remove(); toast('Thanks. We will take a look.'); } catch (e) { toast(e.message); }
+}
+boardRemove.addEventListener('click', async () => {
+  if (!confirm('Take your name and minutes off the board?')) return;
+  try { await boardCall('/remove', {}); lsSet('sp_board_pid', ''); toast('Your name is off the board.'); openBoard(); } catch (e) { toast(e.message); }
+});
+document.getElementById('tabPeople').addEventListener('click', () => { boardTab = 'people'; renderBoard(); });
+document.getElementById('tabCountries').addEventListener('click', () => { boardTab = 'countries'; renderBoard(); });
+bSee.addEventListener('click', () => { fDoneSheet.hidden = true; openBoard(); });
+const focusBoardBtn = document.getElementById('focusBoard');
+focusBoardBtn.hidden = !BOARD_URL;
+focusBoardBtn.addEventListener('click', () => { focusSheet.hidden = true; openBoard(); });
+document.getElementById('boardClose').addEventListener('click', () => { boardSheet.hidden = true; });
+boardSheet.addEventListener('click', (e) => { if (e.target === boardSheet) boardSheet.hidden = true; });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !boardSheet.hidden) boardSheet.hidden = true; });
 
 // ---------- Loop ----------
 let last = performance.now();
