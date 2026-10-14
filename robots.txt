@@ -1,0 +1,23 @@
+# app.fallinginsand.com: everything public may be crawled, including by AI assistants and their search tools.
+User-agent: *
+Allow: /
+
+# Named so it is clear they are welcome (search and answer engines, AI assistants).
+User-agent: Googlebot
+User-agent: Google-Extended
+User-agent: Bingbot
+User-agent: OAI-SearchBot
+User-agent: ChatGPT-User
+User-agent: GPTBot
+User-agent: ClaudeBot
+User-agent: Claude-SearchBot
+User-agent: Claude-User
+User-agent: PerplexityBot
+User-agent: Perplexity-User
+User-agent: Applebot
+User-agent: Applebot-Extended
+User-agent: meta-externalagent
+User-agent: DuckAssistBot
+Allow: /
+
+Sitemap: https://app.fallinginsand.com/sitemap.xml
