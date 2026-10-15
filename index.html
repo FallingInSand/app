@@ -210,6 +210,9 @@ h1 .tm { font-family: "Instrument Sans", system-ui, sans-serif; font-size: 0.32e
 .real p { margin: 0 auto 22px; max-width: 30rem; color: var(--muted); }
 .buy { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; font-weight: 600; border-radius: 999px; padding: 13px 28px; background: var(--btn-bg); color: var(--btn-ink); }
 .buy:hover { background: var(--btn-hover); }
+/* Remote feature switches: a feature switched off (class off-<name> on <html>) loses its entry points. */
+.off-record #recBtn, .off-message #msgBtn, .off-focus #focusBtn, .off-board #focusBoard, .off-board #bJoin,
+.off-mail .set-row:has(#dMail), .off-shop #buyMain, .off-shop #buyGift { display: none !important; }
 .buy:focus-visible, .gift:focus-visible { outline: 2px solid var(--on); outline-offset: 3px; }
 .gift { display: block; margin-top: 14px; color: var(--muted); font-size: 14px; text-decoration: underline; text-underline-offset: 3px; }
 .nudge { position: absolute; left: 50%; bottom: 7%; transform: translate(-50%, 12px); width: 82%; padding: 14px 16px; border-radius: 16px; background: rgba(24, 28, 34, 0.86); color: #f4f6f8; text-align: center; opacity: 0; pointer-events: none; transition: opacity 0.5s ease, transform 0.5s ease; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
@@ -344,6 +347,10 @@ body.focus .stage { min-height: 100vh; min-height: 100dvh; justify-content: cent
 @media (max-width: 420px) { .stage { padding: 0 16px 96px; } .ritual { margin: 20px 0 18px; } .seg { gap: 22px; } }
 @media (prefers-reduced-motion: reduce) { .count .num, .peace-done, .week .d { transition: none; } }
 </style>
+<script>/* Remote feature switches (worker/flags.json, served at /flags): the last copy the app saw is applied before
+   anything draws, so a switched-off feature stays off even offline. FEATURES lists what can be switched off. */
+(function () { try { var f = JSON.parse(localStorage.getItem('sp_flags') || '{}');
+  for (var k in f) if (f[k] === false) document.documentElement.classList.add('off-' + k); } catch (e) {} })();</script>
 </head>
 <body>
 <main class="stage">
@@ -1377,6 +1384,7 @@ function decodeStrokes(code) {
   } catch (e) { return null; }
 }
 async function sendMessage() {
+  if (!feature('message')) return;
   if (!strokes.length) { toast('Write something with Draw first.'); selectTool('draw'); return; }
   track('sand_message');
   const url = PLAY_URL + '?utm_source=sand_message&utm_medium=share&utm_campaign=digital_tray#m=' + encodeStrokes();
@@ -1596,6 +1604,7 @@ function recordingFailed() {
   track('clip_failed');
 }
 function startRecording() {
+  if (!feature('record')) return;
   if (rec) return;
   track('record_start');
   const comp = document.createElement('canvas'); comp.width = 720; comp.height = 1280;
@@ -2027,6 +2036,25 @@ if (typeof window !== 'undefined' && Array.isArray(window.__spErrs)) {
 }
 // stats-logic end
 
+// Remote feature switches. Every feature is on unless worker/flags.json says false. The app asks /flags once per
+// start (4 s timeout); the answer is kept for next time and applied at once. Offline or blocked: the last answer.
+const FEATURES = ['record', 'message', 'focus', 'board', 'mail', 'shop'];
+const FLAGS_URL = TRACK_URL ? TRACK_URL.replace(/\/e$/, '/flags') : '';
+function feature(name) { return !document.documentElement.classList.contains('off-' + name); }
+function applyFlags(f) {
+  for (const k of FEATURES) document.documentElement.classList.toggle('off-' + k, f[k] === false);
+}
+if (FLAGS_URL && typeof fetch === 'function') {
+  const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+  if (ctl) setTimeout(() => ctl.abort(), 4000);
+  fetch(FLAGS_URL, { cache: 'no-store', signal: ctl ? ctl.signal : undefined }).then((r) => (r.ok ? r.json() : null)).then((f) => {
+    if (!f || typeof f !== 'object') return;
+    const clean = {}; for (const k of FEATURES) if (typeof f[k] === 'boolean') clean[k] = f[k];
+    try { localStorage.setItem('sp_flags', JSON.stringify(clean)); } catch (e) {}
+    applyFlags(clean);
+  }).catch(() => {});
+}
+
 const dNum = document.getElementById('dNum'), dUnit = document.getElementById('dUnit'), dPrompt = document.getElementById('dPrompt');
 const dHeal = document.getElementById('dHeal'), dDate = document.getElementById('dDate'), sStat = document.getElementById('sStat');
 const dWeek = document.getElementById('dWeek'), dMeta = document.getElementById('dMeta'), dNext = document.getElementById('dNext'), dRemind = document.getElementById('dRemind');
@@ -2270,6 +2298,7 @@ function focusTick() {
   } else fTime.textContent = mmss(now - focusState.start);
 }
 function startFocus(mins) {
+  if (!feature('focus')) return;
   focusSheet.hidden = true;
   Object.assign(focusState, { on: true, start: Date.now(), end: mins ? Date.now() + mins * 60000 : 0, mins, done: false, prevMusic: musicOn });
   fNote.textContent = mins ? 'Focus' : 'Open-ended focus';
@@ -2338,7 +2367,7 @@ let mailSrc = 'settings';
 function mailSignedUp() { try { return localStorage.getItem('sp_mail') === '1'; } catch (e) { return false; } }
 function syncMailRow() { const b = document.getElementById('dMail'); b.textContent = mailSignedUp() ? 'Signed up' : 'Sign up'; b.disabled = mailSignedUp(); }
 function openMail(src) {
-  if (!SUB_URL || mailSignedUp()) return;
+  if (!SUB_URL || mailSignedUp() || !feature('mail')) return;
   mailSrc = src; mailForm.hidden = false; document.getElementById('mailThanks').hidden = true;
   document.getElementById('mailLater').textContent = 'Not now';
   mailGo.disabled = false; mailNote.innerHTML = MAIL_NOTE;
@@ -2408,7 +2437,7 @@ const bMsg = document.getElementById('bMsg'), bDone = document.getElementById('b
 const boardSheet = document.getElementById('boardSheet'), boardList = document.getElementById('boardList'), boardSub = document.getElementById('boardSub');
 const boardRemove = document.getElementById('boardRemove');
 function boardOffer() {
-  bJoin.hidden = !boardStopped;
+  bJoin.hidden = !boardStopped || !feature('board');
   bForm.hidden = true; bJoinOpen.hidden = false; bDone.hidden = true; bSee.hidden = true;
   bAdd.disabled = false; bMsg.textContent = 'Your name, country and minutes are public for 30 days.';
 }
@@ -2469,6 +2498,7 @@ function renderBoard() {
   if (!boardList.children.length) boardList.appendChild(boardRow([['bn', 'No one yet today. Focus for a minute and add your name.']]));
 }
 async function openBoard() {
+  if (!feature('board')) return;
   boardSheet.hidden = false; boardData = null; renderBoard();
   boardSub.textContent = 'Loading…';
   boardRemove.hidden = !lsGet('sp_board_pid');
