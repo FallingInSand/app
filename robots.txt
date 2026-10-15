@@ -1,6 +1,8 @@
 # app.fallinginsand.com: everything public may be crawled, including by AI assistants and their search tools.
+# Except /preview/: per-PR previews of unreleased changes (pr-preview workflow).
 User-agent: *
 Allow: /
+Disallow: /preview/
 
 # Named so it is clear they are welcome (search and answer engines, AI assistants).
 User-agent: Googlebot
@@ -19,5 +21,6 @@ User-agent: Applebot-Extended
 User-agent: meta-externalagent
 User-agent: DuckAssistBot
 Allow: /
+Disallow: /preview/
 
 Sitemap: https://app.fallinginsand.com/sitemap.xml
