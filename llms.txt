@@ -17,6 +17,7 @@ Key facts:
 - [About Sand Peace](https://app.fallinginsand.com/about.html): what it is, how the ritual works, and common questions
 - [Sand Peace web app](https://app.fallinginsand.com/): the ritual itself (an interactive canvas)
 - [Privacy](https://app.fallinginsand.com/privacy.html): what stays on your device and the anonymous statistics
+- [Support](https://app.fallinginsand.com/support.html): common questions and how to reach FallingInSand
 
 ## Optional
 

@@ -458,6 +458,7 @@ body.focus .stage { min-height: 100vh; min-height: 100dvh; justify-content: cent
     <div class="set-row set-col"><span class="set-line"><span class="set-k">Anonymous statistics</span><button class="textbtn" id="dStats" aria-pressed="true">On</button></span>
       <span class="set-note">Counts like &ldquo;ritual done&rdquo;, with a random ID that isn&rsquo;t linked to you. Never what you write. Details in the privacy policy.</span></div>
     <div class="set-row"><span class="set-k">Privacy</span><a class="textbtn" id="dPrivacy" href="https://app.fallinginsand.com/privacy.html" target="_blank" rel="noopener">Privacy policy</a></div>
+    <div class="set-row"><span class="set-k">Help</span><a class="textbtn" id="dSupport" href="https://app.fallinginsand.com/support.html" target="_blank" rel="noopener">Help &amp; support</a></div>
   </div>
 </div>
 <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" hidden>
@@ -1429,6 +1430,9 @@ function replayTick() {
 // normal speed (no time-lapse, so the clip needs no speeding up) until it is fully healed, then a short end card.
 let rec = null;
 const recBtn = document.getElementById('recBtn'), recLabel = document.getElementById('recLabel'), stopBtn = document.getElementById('stopBtn');
+// Store builds say "Record a clip": their screenshots are store listing material, where "heal" is not used (CLAUDE.md rule 1).
+const REC_LABEL = STORE ? 'Record a clip' : 'Record a heal';
+recBtn.textContent = REC_LABEL;
 const WRITE_MAX = 40, HEAL_MIN = 5, END_LEN = 3.5;
 // The heal stops once the sand is healed, or after one full turn of the arm at the chosen arm speed.
 function healMax() { return Math.min(100, revSeconds() * 1.1 + 2); }
@@ -1599,7 +1603,7 @@ async function fixWebmDuration(blob, ms) {
   return blob;
 }
 function recordingFailed() {
-  rec = null; recBtn.disabled = false; speedBoost = 1; recBtn.textContent = 'Record a heal'; stopBtn.hidden = true; recLabel.hidden = true;
+  rec = null; recBtn.disabled = false; speedBoost = 1; recBtn.textContent = REC_LABEL; stopBtn.hidden = true; recLabel.hidden = true;
   toast('The video couldn\u2019t be finished. Please try again.');
   track('clip_failed');
 }
@@ -1708,7 +1712,7 @@ let clipFile = null, clipUrl = null;
 function finishRecording(blob) {
   track('clip_ready');
   setTimeout(renderDaily, 0);
-  rec = null; recBtn.disabled = false; speedBoost = 1; recBtn.textContent = 'Record a heal'; stopBtn.hidden = true;
+  rec = null; recBtn.disabled = false; speedBoost = 1; recBtn.textContent = REC_LABEL; stopBtn.hidden = true;
   const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
   clipFile = new File([blob], 'let-it-heal.' + ext, { type: blob.type });
   if (clipUrl) URL.revokeObjectURL(clipUrl);
