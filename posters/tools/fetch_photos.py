@@ -95,6 +95,7 @@ def openverse(query, n=20):
     time.sleep(3.5)  # anon burst is 20/min
     out = []
     for r in d.get("results", []):
+        if r.get("source") == "wikimedia": continue  # already covered by the Commons API
         if r["license"] not in OK_CC: continue
         lic = ("CC0 1.0" if r["license"] == "cc0" else "Public Domain Mark 1.0" if r["license"] == "pdm"
                else f"CC {r['license'].upper()} {r.get('license_version') or ''}".strip())
@@ -130,13 +131,17 @@ def search_all(queries, keep):
     seen, out = set(), []
     for q in queries:
         for fn in SOURCES:
-            try: res = fn(q)
-            except Exception as e: print(f"  {fn.__name__} failed for {q!r}: {e}", file=sys.stderr); res = []
+            cf = WORK / "cache" / f"{fn.__name__}-{safe(q)}.json"
+            if cf.exists(): res = json.loads(cf.read_text())
+            else:
+                try:
+                    res = fn(q)
+                    if fn in (commons, openverse) or res: cf.parent.mkdir(parents=True, exist_ok=True); cf.write_text(json.dumps(res))
+                except Exception as e: print(f"  {fn.__name__} failed for {q!r}: {e}", file=sys.stderr); res = []
             for r in res:
                 key = (r["source"].split("/")[-1], r["page"])
                 if key in seen or not keep(r): continue
                 seen.add(key); r["query"] = q; out.append(r)
-            if fn is commons: time.sleep(2)
     return out
 
 TEXTY = re.compile(r"\b(logo|map|poster|diagram|plan|sign|ticket|night view panorama 360|aerial|drone|interior|museum)\b", re.I)
