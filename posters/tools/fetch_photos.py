@@ -5,8 +5,10 @@ Sources (in order): Wikimedia Commons API, Openverse API, then Unsplash/Pexels
 when UNSPLASH_ACCESS_KEY / PEXELS_API_KEY are set. Only CC0, PDM, CC BY,
 CC BY-SA, Unsplash and Pexels licences are accepted.
 
-Usage: python3 -I tools/fetch_photos.py search   # metadata only -> work/candidates.json
-       python3 -I tools/fetch_photos.py download # thumbs + scoring + top 8
+Usage (needs Python 3.9+, Pillow and numpy):
+  python3 tools/fetch_photos.py search    # metadata only -> work/candidates.json
+  python3 tools/fetch_photos.py boats     # downloads boat candidates -> work/boat_candidates/
+  python3 tools/fetch_photos.py download  # scores landmarks, saves top 8 per city -> input/landmarks/candidates/
 """
 import json, os, re, sys, time, io, urllib.parse, urllib.request, urllib.error, html
 from pathlib import Path
@@ -82,7 +84,7 @@ def commons(query, limit=40):
         out.append(dict(source="wikimedia", id=pg["title"], title=pg["title"].removeprefix("File:"),
             width=ii.get("width", 0), height=ii.get("height", 0),
             download=ii.get("thumburl") if ii.get("width", 0) > 2400 else ii.get("url"),
-            thumb=ii.get("url") if ii.get("width",0) <= 800 else re.sub(r"/\d+px-", "/800px-", ii.get("thumburl", "")),
+            thumb=ii.get("url") if ii.get("width",0) <= 960 else re.sub(r"/\d+px-", "/960px-", ii.get("thumburl", "")),
             page=ii.get("descriptionurl"), author=strip_html(md.get("Artist", {}).get("value", "")) or "Unknown",
             licence=lic_short, licence_url=md.get("LicenseUrl", {}).get("value", "") or ("https://creativecommons.org/publicdomain/zero/1.0/" if lic=="cc0" else ""),
             desc=strip_html(md.get("ImageDescription", {}).get("value", ""))[:300]))
@@ -194,6 +196,13 @@ def score_image(im):
 META_BONUS = re.compile(r"sunset|dusk|golden|evening|twilight|sunrise|harbou?r|bay|river|skyline|waterfront|from the|across", re.I)
 META_BAD = re.compile(r"watermark|night|construction|crowd|parade|festival|fireworks|interior|bw|black and white|monochrome|1[89]\d\d", re.I)
 
+def wm_url(r, kind):
+    """Map a Commons record to a standard-size URL (960px for scoring, 3840px or original for download)."""
+    u = r[kind]
+    if r["source"] != "wikimedia" or "/thumb/" not in u: return u
+    if kind == "thumb": return re.sub(r"/\d+px-", "/960px-", u)
+    return re.sub(r"/\d+px-", "/3840px-", u) if r["width"] > 3840 else re.sub(r"/thumb(/.+)/[^/]+$", r"\1", u)
+
 def safe(s): return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")[:60]
 
 def cmd_download():
@@ -209,7 +218,7 @@ def cmd_download():
         print(f"[{city}] scoring {len(pool)} of {len(items)}", file=sys.stderr)
         scored = []
         for r in pool:
-            try: im = to_rgb_small(get_bytes(r["thumb"] if r["source"] == "wikimedia" else r["download"]))
+            try: im = to_rgb_small(get_bytes(wm_url(r, "thumb") if r["source"] == "wikimedia" else r["download"]))
             except Exception as e: print("  thumb fail", e, file=sys.stderr); continue
             s, parts = score_image(im); r["score"] = round(s + r["meta"] * .5, 1); r["parts"] = parts
             scored.append(r); time.sleep(.5)
@@ -218,7 +227,7 @@ def cmd_download():
         for i, r in enumerate(top, 1):
             fn = cdir / f"{i:02d}-{safe(r['title'].rsplit('.',1)[0])}.jpg"
             if not fn.exists():
-                data = get_bytes(r["download"])
+                data = get_bytes(wm_url(r, "download"))
                 im = Image.open(io.BytesIO(data)).convert("RGB")
                 if im.width > 2400: im = im.resize((2400, round(im.height * 2400 / im.width)), Image.LANCZOS)
                 im.save(fn, quality=92); time.sleep(1)
@@ -234,7 +243,7 @@ def cmd_boats():
     for i, r in enumerate(cand):
         fn = d / f"{i:02d}-{safe(r['title'].rsplit('.',1)[0])}.jpg"
         if not fn.exists():
-            try: data = get_bytes(r["download"])
+            try: data = get_bytes(wm_url(r, "download"))
             except Exception as e: print("fail", e, file=sys.stderr); continue
             im = Image.open(io.BytesIO(data)).convert("RGB"); im.save(fn, quality=92); time.sleep(.5)
         im = Image.open(fn); r["file"] = str(fn.relative_to(ROOT)); r["actual"] = im.size; out.append(r)
